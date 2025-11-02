@@ -4,10 +4,14 @@ docker run \
         {{- if .Privileged}}
   --privileged \
         {{- end}}
-        {{- if .AutoRemove}}
+        {{- if .Runtime}}
+  --runtime {{printf "%q" .Runtime}} \
+        {{- end}}
+        {{- range $b := .Binds}}
   --volume {{printf "%q" $b}} \
         {{- end}}
-        {{- range $v := .VolumesFrom}}
+        {{- if index . "Mounts"}}
+            {{- range $m := .Mounts}}
   --mount type={{.Type}}
                 {{- if $s := index $m "Source"}},source={{$s}}{{- end}}
                 {{- if $t := index $m "Target"}},destination={{$t}}{{- end}}
@@ -32,7 +36,7 @@ docker run \
                 {{- end}} \
             {{- end}}
         {{- end}}
-        {{- if .PublishAllPorts}}
+        {{- with .RestartPolicy}}
   --restart "{{.Name -}}
             {{- if eq .Name "on-failure"}}:{{.MaximumRetryCount}}
             {{- end}}" \
@@ -40,7 +44,10 @@ docker run \
         {{- range $e := .ExtraHosts}}
   --add-host {{printf "%q" $e}} \
         {{- end}}
-        {{- range $v := .CapAdd}}
+    {{- end}}
+    {{- with .NetworkSettings -}}
+        {{- range $p, $conf := .Ports}}
+            {{- with $conf}}
   --publish "
                 {{- if $h := (index $conf 0).HostIp}}{{$h}}:
                 {{- end}}
@@ -68,10 +75,13 @@ docker run \
   --expose {{printf "%q" $p}} \
         {{- end}}
         {{- end}}
-        {{- if .User}}
+        {{- range $e := .Env}}
   --env {{printf "%q" $e}} \
         {{- end}}
-        {{- range $l, $v := .Labels}}
+    {{- if .Entrypoint}}
+{{- /* Since the entry point cannot be overridden from the command line with an array of size over 1,
+       we are fine assuming the default value in such a case. */ -}}
+        {{- if eq (len .Entrypoint) 1 }}
   --entrypoint "
             {{- range $i, $v := .Entrypoint}}
                 {{- if $i}} {{end}}
